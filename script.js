@@ -1,4 +1,4 @@
-// Функция автошифта с правильной логикой
+// Функция автошифта с постоянным количеством отдыхающих
 function performAutoshift() {
     if (!currentSystem) {
         alert('Сначала инициализируйте систему!');
@@ -7,66 +7,89 @@ function performAutoshift() {
 
     console.log("=== НАЧАЛО АВТОШИФТА ===");
 
+    // Фиксируем количество отдыхающих, которое должно остаться
+    const targetRestingCount = currentSystem.restingEmployees;
+    console.log("Должно остаться на отдыхе:", targetRestingCount);
+
     // 1. ВСЕ сотрудники с отдыха выходят в зал
-    const restingEmployees = currentSystem.employees.filter(emp => emp.isResting);
-    console.log("С отдыха выходят:", restingEmployees.length, "сотрудников");
+    const allRestingEmployees = currentSystem.employees.filter(emp => emp.isResting);
+    console.log("С отдыха выходят:", allRestingEmployees.length, "сотрудников");
 
-    // 2. Для каждого пита создаем цепочку замен
+    // 2. Собираем ВСЕХ сотрудников в один пул
+    const allEmployeesPool = [
+        ...currentSystem.employees.filter(emp => !emp.isResting), // работающие
+        ...allRestingEmployees // отдыхающие
+    ];
+    console.log("Всего сотрудников в пуле:", allEmployeesPool.length);
+
+    // 3. Перемешиваем пул для случайного распределения
+    const shuffledEmployees = [...allEmployeesPool].sort(() => Math.random() - 0.5);
+
+    // 4. Распределяем сотрудников по питам
+    let employeeIndex = 0;
+    
     currentSystem.pits.forEach(pit => {
-        console.log(`Обрабатываем Пит ${pit.id}:`);
+        pit.employees = [];
         
-        // Все сотрудники пита (текущие работающие)
-        const currentPitEmployees = [...pit.employees];
-        console.log("Текущие сотрудники в пите:", currentPitEmployees.length);
-        
-        // Сотрудники, которые придут в этот пит с отдыха
-        const incomingEmployees = restingEmployees.splice(0, currentPitEmployees.length);
-        console.log("Приходят с отдыха:", incomingEmployees.length);
-
-        if (incomingEmployees.length > 0) {
-            // Создаем новую цепочку: новые сотрудники + текущие
-            const newChain = [...incomingEmployees, ...currentPitEmployees];
-            
-            // Оставляем только необходимое количество (по позициям в пите)
-            pit.employees = newChain.slice(0, pit.positions);
-            
-            // Те, кто не влез - идут на отдых
-            const goingToRest = newChain.slice(pit.positions);
-            goingToRest.forEach(emp => {
-                emp.isResting = true;
-                emp.pit = null;
-                emp.position = null;
-                emp.chain = null;
-            });
-            
-            // Обновляем позиции оставшихся сотрудников
-            pit.employees.forEach((emp, index) => {
-                emp.isResting = false;
-                emp.pit = pit.id;
-                emp.position = index + 1;
-            });
-
-            console.log("Осталось в пите:", pit.employees.length);
-            console.log("Ушло на отдых:", goingToRest.length);
+        // Заполняем пит сотрудниками из пула
+        for (let i = 0; i < pit.positions && employeeIndex < shuffledEmployees.length; i++) {
+            const employee = shuffledEmployees[employeeIndex];
+            employee.isResting = false;
+            employee.pit = pit.id;
+            employee.position = i + 1;
+            pit.employees.push(employee);
+            employeeIndex++;
         }
     });
 
-    // 3. Оставшиеся сотрудники с отдыха (если не все разместились)
-    restingEmployees.forEach(emp => {
-        emp.isResting = true; // остаются на отдыхе
+    // 5. Оставшиеся сотрудники идут на отдых (ровно targetRestingCount)
+    const remainingEmployees = shuffledEmployees.slice(employeeIndex);
+    
+    // Оставляем ровно targetRestingCount человек на отдыхе
+    const employeesGoingToRest = remainingEmployees.slice(0, targetRestingCount);
+    employeesGoingToRest.forEach(emp => {
+        emp.isResting = true;
+        emp.pit = null;
+        emp.position = null;
+        emp.chain = null;
     });
 
-    // 4. Пересчитываем статистику
+    // 6. Если остались "лишние" сотрудники после targetRestingCount, 
+    // распределяем их обратно в питы (если есть свободные места)
+    const extraEmployees = remainingEmployees.slice(targetRestingCount);
+    if (extraEmployees.length > 0) {
+        console.log("Лишние сотрудники для распределения:", extraEmployees.length);
+        
+        extraEmployees.forEach(emp => {
+            // Ищем пит со свободными местами
+            const availablePit = currentSystem.pits.find(pit => 
+                pit.employees.length < pit.positions
+            );
+            
+            if (availablePit) {
+                emp.isResting = false;
+                emp.pit = availablePit.id;
+                emp.position = availablePit.employees.length + 1;
+                availablePit.employees.push(emp);
+            } else {
+                // Если нет свободных мест - оставляем на отдыхе
+                emp.isResting = true;
+            }
+        });
+    }
+
+    // 7. Пересчитываем актуальное количество отдыхающих
     currentSystem.restingEmployees = currentSystem.employees.filter(emp => emp.isResting).length;
-    
-    // 5. Пересоздаем цепочки
+    console.log("Фактически на отдыхе:", currentSystem.restingEmployees);
+
+    // 8. Пересоздаем цепочки
     createChains();
     
-    // 6. Обновляем отображение
+    // 9. Обновляем отображение
     updateDisplay();
     
     console.log("=== АВТОШИФТ ЗАВЕРШЕН ===");
-    showNotification('Автошифт выполнен! Все с отдыха вышли в зал');
+    showNotification(`Автошифт выполнен! На отдыхе: ${currentSystem.restingEmployees} чел.`);
 }
 
 // Упрощенное создание цепочек
@@ -76,12 +99,20 @@ function createChains() {
     currentSystem.pits.forEach(pit => {
         pit.chains = [];
         
-        // Просто делим сотрудников на цепочки по 3-5 человек
-        const chainSize = Math.min(4, Math.ceil(pit.employees.length / 2));
+        if (pit.employees.length === 0) return;
+        
+        // Делим сотрудников на цепочки по 2-4 человека
+        const chainSize = Math.min(4, Math.max(2, Math.ceil(pit.employees.length / 3)));
         
         for (let i = 0; i < pit.employees.length; i += chainSize) {
             const chain = pit.employees.slice(i, i + chainSize);
             pit.chains.push(chain);
+            
+            // Помечаем сотрудников принадлежность к цепочке
+            chain.forEach((emp, index) => {
+                emp.chain = pit.chains.length - 1;
+                emp.chainPosition = index;
+            });
         }
     });
 }
