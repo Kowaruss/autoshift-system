@@ -1,283 +1,330 @@
-let currentSystem = null;
+// Основные переменные
+let employees = [];
+let pits = [];
+let currentShift = 0;
+let employeeHistory = {};
+const totalPits = 5;
+const tablesPerPit = 5;
+const shiftDuration = 12; // часов
+const intervalsPerHour = 3; // 20 минутные интервалы
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('pitsCount').addEventListener('change', generatePitsConfig);
-    document.getElementById('initBtn').addEventListener('click', initializeSystem);
-    document.getElementById('autoshiftBtn').addEventListener('click', performAutoshift);
-    
-    generatePitsConfig();
-    console.log("Сайт загружен!");
-});
+// Русские фамилии для генерации
+const russianSurnames = [
+    'Иванов', 'Петров', 'Сидоров', 'Кузнецов', 'Попов', 'Васильев', 'Смирнов', 'Новиков',
+    'Фёдоров', 'Морозов', 'Волков', 'Алексеев', 'Лебедев', 'Семёнов', 'Егоров', 'Павлов',
+    'Козлов', 'Степанов', 'Николаев', 'Орлов', 'Андреев', 'Макаров', 'Никитин', 'Захаров',
+    'Зайцев', 'Соловьёв', 'Борисов', 'Яковлев', 'Григорьев', 'Романов', 'Воробьёв', 'Сергеев',
+    'Фролов', 'Гаврилов', 'Карпов', 'Киселёв', 'Ильин', 'Максимов', 'Поляков', 'Виноградов'
+];
 
-function generatePitsConfig() {
-    const pitsCount = parseInt(document.getElementById('pitsCount').value);
-    const container = document.getElementById('pitsConfig');
-    container.innerHTML = '<h3>Конфигурация питов:</h3>';
+// Инициализация при загрузке
+function init() {
+    generatePitsConfiguration();
+    updateTimeHeader();
+}
+
+// Генерация конфигурации питов
+function generatePitsConfiguration() {
+    const container = document.getElementById('pitsContainer');
+    container.innerHTML = '';
     
-    for (let i = 1; i <= pitsCount; i++) {
-        const div = document.createElement('div');
-        div.className = 'input-group';
-        div.innerHTML = `
-            <label>Пит ${i} - количество позиций:</label>
-            <input type="number" id="pit${i}Positions" value="${i === 1 ? 15 : 20}" min="1">
+    pits = [];
+    
+    for (let pit = 1; pit <= totalPits; pit++) {
+        const pitDiv = document.createElement('div');
+        pitDiv.className = 'pit';
+        pitDiv.innerHTML = `
+            <div class="pit-config-row">
+                <strong>Пит ${pit}:</strong>
+                <label>
+                    <input type="checkbox" id="pit${pit}Active" checked 
+                           onchange="togglePit(${pit})"> Активен
+                </label>
+            </div>
+            <div id="tablesPit${pit}">
+                ${generateTablesConfiguration(pit)}
+            </div>
         `;
-        container.appendChild(div);
-    }
-}
-
-function initializeSystem() {
-    const pitsCount = parseInt(document.getElementById('pitsCount').value);
-    const totalEmployees = parseInt(document.getElementById('totalEmployees').value);
-    
-    const pitsConfig = [];
-    let totalPositions = 0;
-    
-    for (let i = 1; i <= pitsCount; i++) {
-        const positions = parseInt(document.getElementById(`pit${i}Positions`).value);
-        pitsConfig.push({
-            id: i,
-            positions: positions,
-            employees: [],
-            chains: []
+        container.appendChild(pitDiv);
+        
+        pits.push({
+            id: pit,
+            active: true,
+            tables: Array.from({length: tablesPerPit}, (_, i) => ({
+                id: i + 1,
+                dealer: true,
+                inspector: true
+            }))
         });
-        totalPositions += positions;
-    }
-
-    const restingCount = totalEmployees - totalPositions;
-    
-    if (restingCount < 0) {
-        alert('Ошибка: Недостаточно сотрудников для заполнения всех позиций!');
-        return;
-    }
-
-    currentSystem = {
-        pits: pitsConfig,
-        totalEmployees: totalEmployees,
-        restingEmployees: restingCount,
-        employees: Array.from({length: totalEmployees}, (_, i) => ({
-            id: i + 1,
-            pit: null,
-            position: null,
-            isResting: false,
-            chain: null
-        }))
-    };
-
-    distributeEmployees();
-    createChains();
-    updateDisplay();
-    document.getElementById('autoshiftBtn').disabled = false;
-    
-    console.log("Система инициализирована! Отдыхающих:", restingCount);
-}
-
-function distributeEmployees() {
-    if (!currentSystem) return;
-
-    let employeeIndex = 0;
-    
-    currentSystem.pits.forEach(pit => {
-        pit.employees = [];
-        for (let i = 0; i < pit.positions; i++) {
-            if (employeeIndex < currentSystem.totalEmployees) {
-                const employee = currentSystem.employees[employeeIndex];
-                employee.pit = pit.id;
-                employee.position = i + 1;
-                employee.isResting = false;
-                pit.employees.push(employee);
-                employeeIndex++;
-            }
-        }
-    });
-
-    for (let i = employeeIndex; i < currentSystem.totalEmployees; i++) {
-        currentSystem.employees[i].isResting = true;
-        currentSystem.employees[i].pit = null;
-        currentSystem.employees[i].position = null;
     }
 }
 
-// Создание цепочек - количество цепочек = количеству отдыхающих
-function createChains() {
-    if (!currentSystem) return;
+function togglePit(pitNumber) {
+    const isActive = document.getElementById(`pit${pitNumber}Active`).checked;
+    const tablesDiv = document.getElementById(`tablesPit${pitNumber}`);
+    
+    pits[pitNumber - 1].active = isActive;
+    tablesDiv.style.display = isActive ? 'block' : 'none';
+}
 
-    const restingCount = currentSystem.restingEmployees;
-    console.log("Создаем цепочки. Количество цепочек = отдыхающим:", restingCount);
+function generateTablesConfiguration(pitNumber) {
+    let html = '';
+    for (let table = 1; table <= tablesPerPit; table++) {
+        html += `
+            <div class="table-config-row">
+                Стол ${table}:
+                <div class="position-checkbox">
+                    <label>
+                        <input type="checkbox" id="pit${pitNumber}table${table}dealer" checked 
+                               onchange="updateTableConfig(${pitNumber}, ${table}, 'dealer', this.checked)"> Д
+                    </label>
+                    <label>
+                        <input type="checkbox" id="pit${pitNumber}table${table}inspector" checked 
+                               onchange="updateTableConfig(${pitNumber}, ${table}, 'inspector', this.checked)"> И
+                    </label>
+                </div>
+            </div>
+        `;
+    }
+    return html;
+}
 
-    // Очищаем все цепочки
-    currentSystem.pits.forEach(pit => {
-        pit.chains = [];
-    });
+function updateTableConfig(pitNumber, tableNumber, position, isActive) {
+    pits[pitNumber - 1].tables[tableNumber - 1][position] = isActive;
+}
 
-    // Если нет отдыхающих - нет цепочек
-    if (restingCount === 0) {
-        console.log("Нет отдыхающих - цепочки не создаются");
+// Генерация сотрудников
+function generateEmployees() {
+    const count = parseInt(document.getElementById('employeesCount').value);
+    const shuffledSurnames = [...russianSurnames].sort(() => Math.random() - 0.5);
+    
+    employees = shuffledSurnames.slice(0, count).map((surname, index) => ({
+        id: index + 1,
+        surname: surname,
+        currentPit: null
+    }));
+    
+    displayEmployees();
+    employeeHistory = {}; // Сбрасываем историю при новой генерации
+}
+
+function displayEmployees() {
+    const container = document.getElementById('employeesList');
+    container.innerHTML = '<strong>Сотрудники:</strong> ' + 
+        employees.map(emp => emp.surname).join(', ');
+}
+
+// Обновление заголовка времени
+function updateTimeHeader() {
+    const container = document.getElementById('timeHeader');
+    let html = '<div class="name-cell"></div>'; // Пустая ячейка для имен
+    
+    for (let hour = 0; hour < shiftDuration; hour++) {
+        const displayHour = hour + 8; // Начинаем с 8 утра
+        html += `<div class="hour-column">${displayHour}:00</div>`;
+        
+        for (let interval = 0; interval < intervalsPerHour; interval++) {
+            const minutes = interval * 20;
+            html += `<div class="minute-column">${minutes.toString().padStart(2, '0')}</div>`;
+        }
+    }
+    
+    container.innerHTML = html;
+}
+
+// Основная функция расчета шифта
+function calculateShift() {
+    if (employees.length === 0) {
+        alert('Сначала сгенерируйте сотрудников!');
         return;
     }
-
-    // Распределяем цепочки по питам
-    let chainIndex = 0;
     
-    for (let i = 0; i < restingCount; i++) {
-        const pitIndex = chainIndex % currentSystem.pits.length;
-        const pit = currentSystem.pits[pitIndex];
-        
-        if (!pit.chains[i]) {
-            pit.chains[i] = [];
-        }
-        
-        chainIndex++;
+    // Получаем активные позиции
+    const activePositions = getActivePositions();
+    const totalPositions = activePositions.length;
+    
+    if (totalPositions === 0) {
+        alert('Нет активных позиций!');
+        return;
     }
+    
+    // Определяем отдыхающих
+    const restingCount = employees.length - totalPositions;
+    
+    if (restingCount <= 0) {
+        alert('Недостаточно сотрудников для отдыхающих!');
+        return;
+    }
+    
+    // Расчет цепочек
+    const chainLength = Math.floor(totalPositions / restingCount);
+    const extraChains = totalPositions % restingCount;
+    
+    // Распределение отдыхающих по питам
+    const restingPerPit = distributeRestingByPits(restingCount);
+    
+    // Формируем цепочки
+    const chains = formChains(activePositions, restingPerPit, chainLength, extraChains);
+    
+    // Обновляем расписание
+    updateSchedule(chains);
+    
+    currentShift++;
+}
 
-    // Распределяем сотрудников по цепочкам
-    currentSystem.pits.forEach(pit => {
-        if (pit.chains.length > 0) {
-            const employeesPerChain = Math.ceil(pit.employees.length / pit.chains.length);
-            let employeeIndex = 0;
-            
-            pit.chains.forEach(chain => {
-                chain.length = 0; // Очищаем цепочку
-                const chainEmployees = pit.employees.slice(employeeIndex, employeeIndex + employeesPerChain);
-                chain.push(...chainEmployees);
-                employeeIndex += employeesPerChain;
+function getActivePositions() {
+    const positions = [];
+    
+    pits.forEach(pit => {
+        if (pit.active) {
+            pit.tables.forEach(table => {
+                if (table.dealer) {
+                    positions.push({ pit: pit.id, table: table.id, position: 'Д' });
+                }
+                if (table.inspector) {
+                    positions.push({ pit: pit.id, table: table.id, position: 'И' });
+                }
             });
         }
     });
-
-    console.log("Цепочки созданы. Распределение:", 
-        currentSystem.pits.map(pit => `Пит ${pit.id}: ${pit.chains.length} цеп.`).join(', '));
-}
-
-function updateDisplay() {
-    if (!currentSystem) return;
-
-    const container = document.getElementById('pitsContainer');
-    container.innerHTML = '';
-
-    document.getElementById('totalEmployeesCount').textContent = currentSystem.totalEmployees;
-    document.getElementById('workingCount').textContent = currentSystem.totalEmployees - currentSystem.restingEmployees;
-    document.getElementById('restingCount').textContent = currentSystem.restingEmployees;
-
-    currentSystem.pits.forEach(pit => {
-        const pitElement = document.createElement('div');
-        pitElement.className = 'pit';
-        
-        let chainsHTML = '';
-        pit.chains.forEach((chain, index) => {
-            if (chain.length > 0) {
-                chainsHTML += `
-                    <div class="chain">
-                        <div class="chain-title">Цепочка ${index + 1} (${chain.length} чел.)</div>
-                        ${chain.map(emp => `
-                            <div class="employee working">
-                                <span class="employee-id">Сотрудник ${emp.id}</span>
-                                <span class="employee-position">Поз. ${emp.position}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-        });
-
-        pitElement.innerHTML = `
-            <div class="pit-header">
-                <h3 class="pit-title">Пит ${pit.id}</h3>
-                <span>${pit.positions} позиций, ${pit.chains.length} цепочек</span>
-            </div>
-            ${chainsHTML || '<div class="chain">Нет цепочек</div>'}
-        `;
-        container.appendChild(pitElement);
-    });
-
-    const restingEmployees = currentSystem.employees.filter(emp => emp.isResting);
-    const restingElement = document.createElement('div');
-    restingElement.className = 'pit resting-section';
-    restingElement.innerHTML = `
-        <div class="pit-header">
-            <h3 class="pit-title">💤 На отдыхе (${restingEmployees.length})</h3>
-            <span>Цепочек: ${restingEmployees.length}</span>
-        </div>
-        <div class="chain">
-            ${restingEmployees.map(emp => 
-                `<div class="employee resting">
-                    <span class="employee-id">Сотрудник ${emp.id}</span>
-                    <span class="employee-position">Отдых</span>
-                 </div>`
-            ).join('')}
-        </div>
-    `;
-    container.appendChild(restingElement);
-}
-
-function performAutoshift() {
-    if (!currentSystem) {
-        alert('Сначала инициализируйте систему!');
-        return;
-    }
-
-    console.log("=== НАЧАЛО АВТОШИФТА ===");
-
-    const targetRestingCount = currentSystem.restingEmployees;
-    console.log("Количество цепочек (отдыхающих):", targetRestingCount);
-
-    // Сохраняем текущее распределение по цепочкам
-    const oldChains = currentSystem.pits.map(pit => [...pit.chains]);
-
-    // Перемешиваем всех сотрудников
-    const allEmployees = [...currentSystem.employees];
-    const shuffledEmployees = [...allEmployees].sort(() => Math.random() - 0.5);
-
-    // Распределяем сотрудников по позициям
-    let employeeIndex = 0;
     
-    currentSystem.pits.forEach(pit => {
-        pit.employees = [];
-        
-        for (let i = 0; i < pit.positions && employeeIndex < shuffledEmployees.length; i++) {
-            const employee = shuffledEmployees[employeeIndex];
-            employee.isResting = false;
-            employee.pit = pit.id;
-            employee.position = i + 1;
-            pit.employees.push(employee);
-            employeeIndex++;
+    return positions;
+}
+
+function distributeRestingByPits(restingCount) {
+    const restingPerPit = new Array(totalPits).fill(0);
+    const baseResting = Math.floor(restingCount / totalPits);
+    let remaining = restingCount - baseResting * totalPits;
+    
+    // Базовое распределение
+    for (let i = 0; i < totalPits; i++) {
+        restingPerPit[i] = baseResting;
+    }
+    
+    // Распределение остатка
+    for (let i = 0; i < remaining; i++) {
+        restingPerPit[i]++;
+    }
+    
+    return restingPerPit;
+}
+
+function formChains(positions, restingPerPit, chainLength, extraChains) {
+    const chains = [];
+    let positionIndex = 0;
+    
+    // Группируем позиции по питам
+    const positionsByPit = {};
+    pits.forEach(pit => {
+        if (pit.active) {
+            positionsByPit[pit.id] = positions.filter(pos => pos.pit === pit.id);
         }
     });
+    
+    // Формируем цепочки для каждого пита
+    Object.keys(positionsByPit).forEach(pitId => {
+        const pitPositions = positionsByPit[pitId];
+        const pitRestingCount = restingPerPit[pitId - 1];
+        
+        if (pitRestingCount > 0) {
+            const pitChainLength = Math.floor(pitPositions.length / pitRestingCount);
+            const pitExtraChains = pitPositions.length % pitRestingCount;
+            
+            // Выбираем случайных отдыхающих для этого пита
+            const availableResting = employees.filter(emp => 
+                !employeeHistory[emp.id] || employeeHistory[emp.id] !== parseInt(pitId)
+            );
+            
+            const restingForThisPit = availableResting
+                .sort(() => Math.random() - 0.5)
+                .slice(0, pitRestingCount);
+            
+            // Формируем цепочки
+            let posIndex = 0;
+            restingForThisPit.forEach((restingEmp, index) => {
+                const actualChainLength = index < pitExtraChains ? pitChainLength + 1 : pitChainLength;
+                const chain = {
+                    restingEmployee: restingEmp,
+                    positions: pitPositions.slice(posIndex, posIndex + actualChainLength),
+                    pit: parseInt(pitId)
+                };
+                chains.push(chain);
+                posIndex += actualChainLength;
+                
+                // Обновляем историю
+                employeeHistory[restingEmp.id] = parseInt(pitId);
+            });
+        }
+    });
+    
+    return chains;
+}
 
-    // Оставшиеся идут на отдых
-    for (let i = employeeIndex; i < shuffledEmployees.length; i++) {
-        shuffledEmployees[i].isResting = true;
-        shuffledEmployees[i].pit = null;
-        shuffledEmployees[i].position = null;
+function updateSchedule(chains) {
+    const table = document.getElementById('scheduleTable');
+    table.innerHTML = '';
+    
+    // Создаем строки для сотрудников
+    employees.forEach(employee => {
+        const row = document.createElement('div');
+        row.className = 'employee-row';
+        
+        // Ячейка с фамилией
+        const nameCell = document.createElement('div');
+        nameCell.className = 'name-cell';
+        nameCell.textContent = employee.surname;
+        row.appendChild(nameCell);
+        
+        // Ячейки времени
+        for (let hour = 0; hour < shiftDuration; hour++) {
+            for (let interval = 0; interval < intervalsPerHour; interval++) {
+                const timeCell = document.createElement('div');
+                timeCell.className = 'time-cell';
+                
+                // Находим позицию сотрудника в этом интервале
+                const position = findEmployeePosition(employee, hour, interval, chains);
+                if (position) {
+                    timeCell.textContent = `${position.position}${position.table}.${position.pit}`;
+                    timeCell.className += ' work';
+                } else {
+                    timeCell.textContent = 'Отдых';
+                    timeCell.className += ' break';
+                }
+                
+                row.appendChild(timeCell);
+            }
+        }
+        
+        table.appendChild(row);
+    });
+}
+
+function findEmployeePosition(employee, hour, interval, chains) {
+    // Упрощенная логика - для демонстрации
+    // В реальной реализации нужно учитывать длину цепочек и временные интервалы
+    const totalIntervals = shiftDuration * intervalsPerHour;
+    const currentInterval = hour * intervalsPerHour + interval;
+    
+    for (let chain of chains) {
+        if (chain.restingEmployee.id === employee.id) {
+            // Отдыхающий начинает цепочку
+            if (currentInterval === 0) {
+                return chain.positions[0];
+            }
+        } else {
+            // Проверяем другие позиции в цепочке
+            const empIndex = employees.findIndex(emp => emp.id === employee.id);
+            const chainIndex = chains.findIndex(ch => ch.restingEmployee.id === employee.id);
+            
+            if (chainIndex !== -1) {
+                const positionIndex = (currentInterval + empIndex) % chain.positions.length;
+                return chain.positions[positionIndex];
+            }
+        }
     }
-
-    // Количество отдыхающих должно остаться прежним
-    currentSystem.restingEmployees = targetRestingCount;
-
-    // Пересоздаем цепочки (количество = количеству отдыхающих)
-    createChains();
-    updateDisplay();
     
-    console.log("=== АВТОШИФТ ЗАВЕРШЕН ===");
-    showNotification(`Автошифт выполнен! Цепочек: ${currentSystem.restingEmployees}`);
+    return null;
 }
 
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #28a745;
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 1000;
-        animation: slideIn 0.3s ease;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
-}
+// Инициализация при загрузке
+window.onload = init;
