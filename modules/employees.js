@@ -25,8 +25,19 @@ const employeesModule = {
     
     displayEmployees() {
         const container = document.getElementById('employeesList');
-        container.innerHTML = '<strong>Сотрудники:</strong> ' + 
-            this.employees.map(emp => emp.surname).join(', ');
+        container.innerHTML = '<strong>Сотрудники:</strong>';
+        
+        const employeeList = document.createElement('div');
+        employeeList.className = 'employee-list-column';
+        
+        this.employees.forEach(emp => {
+            const employeeItem = document.createElement('div');
+            employeeItem.className = 'employee-item';
+            employeeItem.textContent = emp.surname;
+            employeeList.appendChild(employeeItem);
+        });
+        
+        container.appendChild(employeeList);
     },
     
     getEmployeeById(id) {
