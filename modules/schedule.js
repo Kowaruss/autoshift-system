@@ -8,7 +8,7 @@ const scheduleModule = {
     
     updateTimeHeader() {
         const container = document.getElementById('timeHeader');
-        let html = '<div class="name-cell" style="background: #34495e; color: white; font-weight: bold;">Сотрудник</div>';
+        let html = '<div class="employee-name-cell" style="background: #34495e; color: white; font-weight: bold;">Сотрудник</div>';
         
         for (let hour = 8; hour < 8 + this.shiftDuration; hour++) {
             html += `<div class="hour-column">${hour}:00</div>`;
@@ -48,7 +48,7 @@ const scheduleModule = {
             
             // Ячейка с номером сотрудника
             const nameCell = document.createElement('div');
-            nameCell.className = 'name-cell';
+            nameCell.className = 'employee-name-cell';
             nameCell.textContent = employee.surname;
             row.appendChild(nameCell);
             
@@ -75,17 +75,26 @@ const scheduleModule = {
             if (cells[intervalIndex]) {
                 cells[intervalIndex].textContent = '';
                 cells[intervalIndex].className = 'time-cell';
+                cells[intervalIndex].classList.remove('position-dealer', 'position-inspector');
             }
         }
         
-        // Заполняем рабочие позиции
+        // Заполняем рабочие позиции с цветами
         Object.keys(assignments).forEach(employeeId => {
             const employeeIndex = employeesModule.employees.findIndex(emp => emp.id === parseInt(employeeId));
             if (employeeIndex !== -1) {
                 const cells = rows[employeeIndex].getElementsByClassName('time-cell');
                 if (cells[intervalIndex]) {
-                    cells[intervalIndex].textContent = assignments[employeeId].fullName;
+                    const position = assignments[employeeId];
+                    cells[intervalIndex].textContent = position.fullName;
                     cells[intervalIndex].className = 'time-cell work';
+                    
+                    // Добавляем цвет в зависимости от типа позиции
+                    if (position.type === 'dealer') {
+                        cells[intervalIndex].classList.add('position-dealer');
+                    } else if (position.type === 'inspector') {
+                        cells[intervalIndex].classList.add('position-inspector');
+                    }
                 }
             }
         });
