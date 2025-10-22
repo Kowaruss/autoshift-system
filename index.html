@@ -8,35 +8,29 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚀 Автошифт персонала</h1>
+        <h1>Система автошифта персонала</h1>
         
-        <div class="input-group">
-            <label>Количество питов:</label>
-            <input type="number" id="pitsCount" value="2" min="1">
+        <div class="input-section">
+            <div class="form-group">
+                <label for="employeesCount">Количество сотрудников:</label>
+                <input type="number" id="employeesCount" min="1" max="100" value="20">
+                <button onclick="generateEmployees()">Сгенерировать фамилии</button>
+            </div>
+            
+            <div class="employees-list" id="employeesList"></div>
+            
+            <div class="pits-configuration">
+                <h3>Конфигурация питов:</h3>
+                <div id="pitsContainer"></div>
+            </div>
         </div>
 
-        <div class="input-group">
-            <label>Общее количество сотрудников:</label>
-            <input type="number" id="totalEmployees" value="40" min="1">
-        </div>
-
-        <div id="pitsConfig">
-            <!-- Конфигурация питов будет генерироваться здесь -->
-        </div>
-
-        <div class="controls">
-            <button id="initBtn">Инициализировать систему</button>
-            <button id="autoshiftBtn" disabled>Автошифт</button>
-        </div>
-
-        <div class="stats">
-            <div>Всего сотрудников: <span id="totalEmployeesCount">0</span></div>
-            <div>В зале: <span id="workingCount">0</span></div>
-            <div>На отдыхе: <span id="restingCount">0</span></div>
-        </div>
-
-        <div class="pits-container" id="pitsContainer">
-            <!-- Визуализация питов будет здесь -->
+        <button class="shift-btn" onclick="calculateShift()">ШИФТ</button>
+        
+        <div class="schedule-section">
+            <h3>Расписание смен</h3>
+            <div class="time-header" id="timeHeader"></div>
+            <div class="schedule-table" id="scheduleTable"></div>
         </div>
     </div>
 
