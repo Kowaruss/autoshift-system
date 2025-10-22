@@ -87,7 +87,8 @@ const pitsModule = {
                             pit: pit.id, 
                             table: table.id, 
                             position: 'Д',
-                            fullName: `Д${table.id}.${pit.id}`
+                            fullName: `Д${pit.id}.${table.id}`,
+                            type: 'dealer'
                         });
                     }
                     if (table.inspector) {
@@ -95,7 +96,8 @@ const pitsModule = {
                             pit: pit.id, 
                             table: table.id, 
                             position: 'И',
-                            fullName: `И${table.id}.${pit.id}`
+                            fullName: `И${pit.id}.${table.id}`,
+                            type: 'inspector'
                         });
                     }
                 });
