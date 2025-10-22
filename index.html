@@ -15,8 +15,8 @@
         <div class="input-section">
             <div class="form-group">
                 <label for="employeesCount">Количество сотрудников:</label>
-                <input type="number" id="employeesCount" min="1" max="100" value="20">
-                <button onclick="generateEmployees()">Сгенерировать фамилии</button>
+                <input type="number" id="employeesCount" min="1" max="500" value="3">
+                <button onclick="employeesModule.generateEmployees()">Создать сотрудников</button>
             </div>
             
             <div class="employees-list" id="employeesList"></div>
@@ -27,7 +27,8 @@
             </div>
         </div>
 
-        <button class="shift-btn" onclick="calculateShift()">ШИФТ</button>
+        <div class="current-time" id="currentTime">Текущее время: 8:00</div>
+        <button class="shift-btn" onclick="shiftSystem.calculateShift()">ШИФТ</button>
         
         <div class="schedule-section">
             <h3>Расписание смен</h3>
@@ -36,6 +37,12 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Подключаем модули -->
+    <script src="modules/employees.js"></script>
+    <script src="modules/pits.js"></script>
+    <script src="modules/chains.js"></script>
+    <script src="modules/schedule.js"></script>
+    <script src="modules/time.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
