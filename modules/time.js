@@ -1,4 +1,3 @@
-
 const timeModule = {
     currentTime: { hour: 8, minute: 0 },
     currentShift: 0,
